@@ -1,4 +1,4 @@
-import { TinyFft } from "../../dist/index.js";
+import { TinyFft } from "tinyfft";
 
 const MAX_DIM = 512;
 

@@ -5,10 +5,10 @@
   "type": "module",
   "description": "Browser examples for the tinyfft package",
   "scripts": {
-    "build": "npm --prefix .. run build",
-    "dev": "serve -l 3000 .."
+    "dev": "serve -l 3000 ."
   },
   "devDependencies": {
-    "serve": "^14.2.4"
+    "serve": "^14.2.4",
+    "tinyfft": "0.1.0"
   }
 }

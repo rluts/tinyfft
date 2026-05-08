@@ -164,9 +164,16 @@
       </div>
       <footer>
         Run from the repo root via <code>npm --prefix examples run dev</code>, then open
-        <code>http://localhost:3000/examples/spectrum-viewer/</code>.
+        <code>http://localhost:3000/spectrum-viewer/</code>.
       </footer>
     </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "tinyfft": "../node_modules/tinyfft/dist/index.js"
+        }
+      }
+    </script>
     <script type="module" src="./main.js"></script>
   </body>
 </html>

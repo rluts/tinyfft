@@ -88,18 +88,17 @@ Total tarball published to npm: ~21 KB.
 
 ## Examples
 
-Two browser demos live under [examples/](examples). Both consume the package via the local build (`../../dist/index.js`); after publishing they would `import "tinyfft"` instead.
+Two browser demos live under [examples/](examples). Both consume the package via the npm library (`import "tinyfft"`).
 
 - [examples/spectrum-viewer/](examples/spectrum-viewer) — drop a WAV file, see its STFT spectrogram (linear or log frequency, magma colormap).
 - [examples/image-filter/](examples/image-filter) — drop an image, see a 2D-FFT high-pass filter (Gaussian or ideal cutoff, live slider).
 
 ```bash
 cd examples
-npm install         # serve
-npm run build       # builds the package one level up
-npm run dev         # static server on :3000 rooted at the repo
-# open http://localhost:3000/examples/spectrum-viewer/
-# or   http://localhost:3000/examples/image-filter/
+npm install         # serve + tinyfft
+npm run dev         # static server on :3000
+# open http://localhost:3000/spectrum-viewer/
+# or   http://localhost:3000/image-filter/
 ```
 
 ## Releasing

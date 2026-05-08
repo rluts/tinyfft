@@ -1,4 +1,4 @@
-import { TinyFft } from "../../dist/index.js";
+import { TinyFft } from "tinyfft";
 
 const FFT_SIZE = 1024;
 const MIN_HOP = 256;
