@@ -1,0 +1,83 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p dist-pages/examples/spectrum-viewer
+          mkdir -p dist-pages/examples/node_modules/tinyfft/dist
+
+          cp examples/spectrum-viewer/index.html dist-pages/examples/spectrum-viewer/
+          cp examples/spectrum-viewer/main.js dist-pages/examples/spectrum-viewer/
+          cp dist/index.js dist/wasm-bytes.js dist-pages/examples/node_modules/tinyfft/dist/
+          cp package.json LICENSE README.md dist-pages/examples/node_modules/tinyfft/
+
+          cat > dist-pages/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <meta http-equiv="refresh" content="0; url=./examples/spectrum-viewer/" />
+              <title>tinyfft examples</title>
+            </head>
+            <body>
+              <a href="./examples/spectrum-viewer/">Open tinyfft spectrum viewer</a>
+            </body>
+          </html>
+          HTML
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
