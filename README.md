@@ -5,6 +5,8 @@
 
 Tiny FFT for the browser and Node, written in `no_std` Rust and compiled to WebAssembly. ~11 KB wasm, embedded as base64 in the JS bundle. 1D and 2D, in-place. Zero runtime dependencies.
 
+**Live demos:** [WAV Spectrum Viewer](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) · [FFT Image Filter](https://rluts.github.io/tinyfft/examples/image-filter/)
+
 ```bash
 npm install tinyfft
 ```
