@@ -40,34 +40,24 @@ jobs:
         run: |
           mkdir -p dist-pages/examples/spectrum-viewer
           mkdir -p dist-pages/examples/image-filter
+          mkdir -p dist-pages/examples/player-eq
           mkdir -p dist-pages/examples/lib/tinyfft/dist
 
           cp examples/spectrum-viewer/index.html dist-pages/examples/spectrum-viewer/
           cp examples/spectrum-viewer/main.js dist-pages/examples/spectrum-viewer/
           cp examples/image-filter/index.html dist-pages/examples/image-filter/
           cp examples/image-filter/main.js dist-pages/examples/image-filter/
+          cp examples/player-eq/index.html dist-pages/examples/player-eq/
+          cp examples/player-eq/main.js dist-pages/examples/player-eq/
           cp dist/index.js dist/wasm-bytes.js dist-pages/examples/lib/tinyfft/dist/
 
-          cat > dist-pages/index.html <<'HTML'
-          <!doctype html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <meta http-equiv="refresh" content="0; url=./examples/spectrum-viewer/" />
-              <title>tinyfft examples</title>
-            </head>
-            <body>
-              <a href="./examples/spectrum-viewer/">Open tinyfft spectrum viewer</a>
-            </body>
-          </html>
-          HTML
+          cp .github/pages-index.html dist-pages/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist-pages
 

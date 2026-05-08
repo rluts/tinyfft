@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tinyfft · live demos</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: #0e0e10;
+        color: #e6e6e6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #1f1f24;
+      }
+      h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      header p {
+        color: #888;
+        font-size: 0.85rem;
+        margin: 0.4rem 0 0;
+      }
+      header a {
+        color: #6c79ff;
+        text-decoration: none;
+      }
+      main {
+        padding: 1.5rem;
+        max-width: 1100px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+      a.card {
+        display: block;
+        padding: 1.25rem;
+        background: #16161a;
+        border: 1px solid #1f1f24;
+        border-radius: 10px;
+        color: #e6e6e6;
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s, transform 0.15s;
+      }
+      a.card:hover {
+        background: #1c1c22;
+        border-color: #6c79ff;
+        transform: translateY(-1px);
+      }
+      a.card h2 {
+        margin: 0 0 0.4rem;
+        font-size: 1rem;
+        font-weight: 600;
+      }
+      a.card p {
+        margin: 0;
+        color: #999;
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
+      a.card .tag {
+        display: inline-block;
+        margin-top: 0.6rem;
+        font-family: ui-monospace, monospace;
+        font-size: 0.72rem;
+        color: #6c79ff;
+        background: rgba(108, 121, 255, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+      }
+      footer {
+        padding: 1rem 1.5rem;
+        color: #777;
+        font-size: 0.8rem;
+        border-top: 1px solid #1f1f24;
+      }
+      footer a {
+        color: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>tinyfft · live demos</h1>
+      <p>
+        Tiny no_std FFT compiled to WebAssembly · 1D + 2D · ~11 KB wasm ·
+        <a href="https://www.npmjs.com/package/tinyfft">npm</a> ·
+        <a href="https://github.com/rluts/tinyfft">github</a>
+      </p>
+    </header>
+    <main>
+      <div class="grid">
+        <a class="card" href="./examples/spectrum-viewer/">
+          <h2>Spectrum viewer</h2>
+          <p>Drop a WAV file, see its STFT spectrogram. Linear or log frequency, magma colormap.</p>
+          <span class="tag">1D · STFT</span>
+        </a>
+        <a class="card" href="./examples/image-filter/">
+          <h2>Image high-pass filter</h2>
+          <p>Drop an image, see a 2D-FFT high-pass filter. Gaussian or ideal cutoff, live slider.</p>
+          <span class="tag">2D · high-pass</span>
+        </a>
+        <a class="card" href="./examples/player-eq/">
+          <h2>FFT equalizer player</h2>
+          <p>Drop an audio file, play it through a 10-band overlap-add EQ. ISO octave bands, ±12 dB.</p>
+          <span class="tag">1D · OLA · audio</span>
+        </a>
+      </div>
+    </main>
+    <footer>
+      <code>npm install tinyfft</code> ·
+      <a href="https://github.com/rluts/tinyfft#readme">readme</a>
+    </footer>
+  </body>
+</html>

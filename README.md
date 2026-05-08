@@ -90,18 +90,28 @@ Total tarball published to npm: ~21 KB.
 
 ## Examples
 
-Two browser demos live under [examples/](examples). Both consume the package via the npm library (`import "tinyfft"`).
+Three browser demos live under [examples/](examples). All consume the package via the npm library (`import "tinyfft"`).
 
-- [examples/spectrum-viewer/](examples/spectrum-viewer) — drop a WAV file, see its STFT spectrogram (linear or log frequency, magma colormap).
-- [examples/image-filter/](examples/image-filter) — drop an image, see a 2D-FFT high-pass filter (Gaussian or ideal cutoff, live slider).
+Live: <https://rluts.github.io/tinyfft/>
+
+| Demo | Source | Live |
+| ---- | ------ | ---- |
+| Spectrum viewer (1D STFT) — drop a WAV, see its spectrogram (linear or log freq, magma colormap). | [examples/spectrum-viewer/](examples/spectrum-viewer) | [demo](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) |
+| Image high-pass filter (2D) — drop an image, Gaussian or ideal cutoff, live slider. | [examples/image-filter/](examples/image-filter) | [demo](https://rluts.github.io/tinyfft/examples/image-filter/) |
+| FFT equalizer player (1D OLA) — drop audio, play through a 10-band ISO octave EQ at ±12 dB. | [examples/player-eq/](examples/player-eq) | [demo](https://rluts.github.io/tinyfft/examples/player-eq/) |
+
+Run locally:
 
 ```bash
 cd examples
-npm install         # serve + tinyfft
+npm install         # serve + tinyfft (postinstall copies the package into ./lib)
 npm run dev         # static server on :3000
 # open http://localhost:3000/spectrum-viewer/
 # or   http://localhost:3000/image-filter/
+# or   http://localhost:3000/player-eq/
 ```
+
+The live site is built and deployed by [.github/workflows/pages.yml](.github/workflows/pages.yml) on every push to `main`.
 
 ## Releasing
 
