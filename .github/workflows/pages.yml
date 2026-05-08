@@ -48,10 +48,6 @@ jobs:
           cp examples/image-filter/main.js dist-pages/examples/image-filter/
           cp dist/index.js dist/wasm-bytes.js dist-pages/examples/lib/tinyfft/dist/
 
-          sed -i 's|../node_modules/tinyfft/dist/index.js|../lib/tinyfft/dist/index.js|g' \
-            dist-pages/examples/spectrum-viewer/index.html \
-            dist-pages/examples/image-filter/index.html
-
           cat > dist-pages/index.html <<'HTML'
           <!doctype html>
           <html lang="en">

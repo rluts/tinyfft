@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Browser examples for the tinyfft package",
   "scripts": {
-    "dev": "serve -l 3000 ."
+    "dev": "serve -l 3000 .",
+    "postinstall": "mkdir -p lib/tinyfft/dist && cp node_modules/tinyfft/dist/index.js node_modules/tinyfft/dist/wasm-bytes.js lib/tinyfft/dist/"
   },
   "devDependencies": {
     "serve": "^14.2.4",
