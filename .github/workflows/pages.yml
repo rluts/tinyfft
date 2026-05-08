@@ -28,6 +28,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install npm deps
         run: npm ci
@@ -38,13 +39,14 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir -p dist-pages/examples/spectrum-viewer
-          mkdir -p dist-pages/vendor/tinyfft/dist
+          mkdir -p dist-pages/examples/image-filter
+          mkdir -p dist-pages/examples/node_modules/tinyfft/dist
 
           cp examples/spectrum-viewer/index.html dist-pages/examples/spectrum-viewer/
           cp examples/spectrum-viewer/main.js dist-pages/examples/spectrum-viewer/
-          cp dist/index.js dist/wasm-bytes.js dist-pages/vendor/tinyfft/dist/
-          cp package.json LICENSE README.md dist-pages/vendor/tinyfft/
-          perl -0pi -e 's#../node_modules/tinyfft/dist/index.js#../../vendor/tinyfft/dist/index.js#' dist-pages/examples/spectrum-viewer/index.html
+          cp examples/image-filter/index.html dist-pages/examples/image-filter/
+          cp examples/image-filter/main.js dist-pages/examples/image-filter/
+          cp dist/index.js dist/wasm-bytes.js dist-pages/examples/node_modules/tinyfft/dist/
 
           cat > dist-pages/index.html <<'HTML'
           <!doctype html>
