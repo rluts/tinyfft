@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FFT High-Pass Image Filter · no_std FFT</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: #0e0e10;
+        color: #e6e6e6;
+        min-height: 100vh;
+      }
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #1f1f24;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      header small {
+        color: #777;
+        font-size: 0.8rem;
+      }
+      main {
+        padding: 1.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      label.drop {
+        display: block;
+        border: 1px dashed #2a2a30;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        color: #888;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      label.drop:hover,
+      label.drop.hover {
+        background: #16161a;
+        border-color: #6c79ff;
+        color: #d8d8e0;
+      }
+      label.drop input {
+        display: none;
+      }
+      label.drop b {
+        color: #c8c8d0;
+      }
+      #status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        color: #888;
+        margin-top: 0.85rem;
+      }
+      #info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.4rem 1.5rem;
+        font-size: 0.82rem;
+        color: #999;
+        margin-top: 0.6rem;
+      }
+      #info b {
+        color: #e6e6e6;
+        font-weight: 600;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        align-items: center;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        color: #aaa;
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+      }
+      .controls input[type="range"] {
+        width: 220px;
+        accent-color: #6c79ff;
+      }
+      .controls select {
+        background: #16161a;
+        color: #e6e6e6;
+        border: 1px solid #2a2a30;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+      }
+      .controls .cutoff-value {
+        color: #e6e6e6;
+        font-family: ui-monospace, monospace;
+        min-width: 3.5em;
+        display: inline-block;
+        text-align: right;
+      }
+      .views {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      @media (max-width: 720px) {
+        .views {
+          grid-template-columns: 1fr;
+        }
+      }
+      .view {
+        background: #000;
+        border-radius: 6px;
+        padding: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .view h2 {
+        margin: 0;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .view canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #050505;
+        image-rendering: pixelated;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>FFT High-Pass Image Filter</h1>
+      <small>no_std FFT · 2D · WebAssembly</small>
+    </header>
+    <main>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" />
+        <div>Drop an <b>image</b> here, or click to choose</div>
+      </label>
+      <div id="status">Loading WASM...</div>
+      <div id="info"></div>
+      <div class="controls">
+        <label>
+          Cutoff:
+          <input type="range" id="cutoff" min="0" max="100" value="20" step="1" />
+          <span class="cutoff-value" id="cutoff-val">20</span>
+        </label>
+        <label>
+          Mask:
+          <select id="mask">
+            <option value="gaussian" selected>Gaussian high-pass</option>
+            <option value="ideal">Ideal high-pass</option>
+          </select>
+        </label>
+      </div>
+      <div class="views">
+        <div class="view">
+          <h2>Original (luma, max 512 px)</h2>
+          <canvas id="orig" width="0" height="0"></canvas>
+        </div>
+        <div class="view">
+          <h2>High-pass filtered</h2>
+          <canvas id="filtered" width="0" height="0"></canvas>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+/target
+/dist
+**/node_modules
+**/.DS_Store
+ts/wasm-bytes.ts
+*.tgz
+*.log
+.env
+.idea/
+.vscode/

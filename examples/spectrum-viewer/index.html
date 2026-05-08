@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WAV Spectrum Viewer · no_std FFT</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: #0e0e10;
+        color: #e6e6e6;
+        min-height: 100vh;
+      }
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #1f1f24;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.01em;
+      }
+      header small {
+        color: #777;
+        font-size: 0.8rem;
+      }
+      main {
+        padding: 1.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      label.drop {
+        display: block;
+        border: 1px dashed #2a2a30;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        color: #888;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      label.drop:hover,
+      label.drop.hover {
+        background: #16161a;
+        border-color: #6c79ff;
+        color: #d8d8e0;
+      }
+      label.drop input {
+        display: none;
+      }
+      label.drop b {
+        color: #c8c8d0;
+      }
+      #status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        color: #888;
+        margin-top: 0.85rem;
+      }
+      #info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.4rem 1.5rem;
+        font-size: 0.82rem;
+        color: #999;
+        margin-top: 0.6rem;
+      }
+      #info b {
+        color: #e6e6e6;
+        font-weight: 600;
+      }
+      #canvas-wrap {
+        position: relative;
+        margin-top: 1rem;
+        background: #000;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 60vh;
+        image-rendering: pixelated;
+      }
+      .axis {
+        position: absolute;
+        color: #aaa;
+        font-family: ui-monospace, monospace;
+        font-size: 0.7rem;
+        pointer-events: none;
+      }
+      .axis.y-top {
+        top: 4px;
+        left: 6px;
+      }
+      .axis.y-bot {
+        bottom: 4px;
+        left: 6px;
+      }
+      .axis.x-right {
+        right: 6px;
+        bottom: 4px;
+      }
+      footer {
+        margin-top: 1rem;
+        font-size: 0.78rem;
+        color: #666;
+      }
+      footer code {
+        color: #aaa;
+      }
+      .controls {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        color: #aaa;
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+        cursor: pointer;
+      }
+      .controls input {
+        accent-color: #6c79ff;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>WAV Spectrum Viewer</h1>
+      <small>no_std FFT · WebAssembly</small>
+    </header>
+    <main>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="audio/wav,audio/*" />
+        <div>Drop a <b>.wav</b> file here, or click to choose</div>
+      </label>
+      <div id="status">Loading WASM...</div>
+      <div id="info"></div>
+      <div class="controls">
+        <span>Frequency scale:</span>
+        <label><input type="radio" name="scale" value="linear" checked /> Linear</label>
+        <label><input type="radio" name="scale" value="log" /> Log</label>
+      </div>
+      <div id="canvas-wrap">
+        <canvas id="canvas" width="0" height="0"></canvas>
+        <div class="axis y-top" id="axis-top"></div>
+        <div class="axis y-bot" id="axis-bot"></div>
+        <div class="axis x-right" id="axis-right"></div>
+      </div>
+      <footer>
+        Run from the repo root via <code>npm --prefix examples run dev</code>, then open
+        <code>http://localhost:3000/examples/spectrum-viewer/</code>.
+      </footer>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

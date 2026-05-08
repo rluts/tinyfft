@@ -1,0 +1,54 @@
+{
+  "name": "tinyfft",
+  "version": "0.1.0",
+  "description": "Tiny no_std FFT (Cooley-Tukey radix-2) compiled to WebAssembly. 1D and 2D, ~11 KB wasm embedded as base64. Zero runtime dependencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build:wasm": "cargo build --release --target wasm32-unknown-unknown",
+    "build:ts": "tsc",
+    "build": "node ts/build.mjs",
+    "test:rust": "cargo test --lib",
+    "test:smoke": "node ts/smoke-test.mjs",
+    "test": "npm run test:rust && npm run build && npm run test:smoke",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "fft",
+    "wasm",
+    "webassembly",
+    "no_std",
+    "rust",
+    "audio",
+    "image",
+    "signal-processing",
+    "spectrogram",
+    "dsp"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rluts/tinyfft.git"
+  },
+  "homepage": "https://github.com/rluts/tinyfft#readme",
+  "bugs": "https://github.com/rluts/tinyfft/issues",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
