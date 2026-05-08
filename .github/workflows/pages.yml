@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -18,59 +20,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: examples/package-lock.json
 
-      - name: Install npm deps
+      - name: Install examples deps
+        working-directory: examples
         run: npm ci
 
-      - name: Build package
-        run: npm run build
-
-      - name: Prepare Pages artifact
+      - name: Verify lib/tinyfft was populated
         run: |
-          mkdir -p dist-pages/examples/spectrum-viewer
-          mkdir -p dist-pages/examples/image-filter
-          mkdir -p dist-pages/examples/player-eq
+          test -f examples/lib/tinyfft/dist/index.js
+          test -f examples/lib/tinyfft/dist/wasm-bytes.js
+
+      - name: Build Pages tree
+        run: |
+          mkdir -p dist-pages/examples
+          cp -r examples/spectrum-viewer dist-pages/examples/
+          cp -r examples/image-filter dist-pages/examples/
+          cp -r examples/player-eq dist-pages/examples/
           mkdir -p dist-pages/examples/lib/tinyfft/dist
-
-          cp examples/spectrum-viewer/index.html dist-pages/examples/spectrum-viewer/
-          cp examples/spectrum-viewer/main.js dist-pages/examples/spectrum-viewer/
-          cp examples/image-filter/index.html dist-pages/examples/image-filter/
-          cp examples/image-filter/main.js dist-pages/examples/image-filter/
-          cp examples/player-eq/index.html dist-pages/examples/player-eq/
-          cp examples/player-eq/main.js dist-pages/examples/player-eq/
-          cp dist/index.js dist/wasm-bytes.js dist-pages/examples/lib/tinyfft/dist/
-
+          cp examples/lib/tinyfft/dist/index.js examples/lib/tinyfft/dist/wasm-bytes.js dist-pages/examples/lib/tinyfft/dist/
           cp .github/pages-index.html dist-pages/index.html
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v5
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: dist-pages
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
