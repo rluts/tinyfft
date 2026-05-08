@@ -38,12 +38,13 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir -p dist-pages/examples/spectrum-viewer
-          mkdir -p dist-pages/examples/node_modules/tinyfft/dist
+          mkdir -p dist-pages/vendor/tinyfft/dist
 
           cp examples/spectrum-viewer/index.html dist-pages/examples/spectrum-viewer/
           cp examples/spectrum-viewer/main.js dist-pages/examples/spectrum-viewer/
-          cp dist/index.js dist/wasm-bytes.js dist-pages/examples/node_modules/tinyfft/dist/
-          cp package.json LICENSE README.md dist-pages/examples/node_modules/tinyfft/
+          cp dist/index.js dist/wasm-bytes.js dist-pages/vendor/tinyfft/dist/
+          cp package.json LICENSE README.md dist-pages/vendor/tinyfft/
+          perl -0pi -e 's#../node_modules/tinyfft/dist/index.js#../../vendor/tinyfft/dist/index.js#' dist-pages/examples/spectrum-viewer/index.html
 
           cat > dist-pages/index.html <<'HTML'
           <!doctype html>
