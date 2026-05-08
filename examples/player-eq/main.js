@@ -179,7 +179,7 @@ function scheduleReprocess() {
 
 async function reprocess() {
   if (!originalBuffer) return;
-  const sampleRate = originalBuffer.samplyeRate;
+  const sampleRate = originalBuffer.sampleRate;
   const channels = originalBuffer.numberOfChannels;
   const len = originalBuffer.length;
 
