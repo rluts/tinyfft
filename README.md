@@ -1,6 +1,6 @@
 # tinyfft
 
-[![CI](https://github.com/USER/tinyfft/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/tinyfft/actions/workflows/ci.yml)
+[![CI](https://github.com/rluts/tinyfft/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/tinyfft/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/tinyfft.svg)](https://www.npmjs.com/package/tinyfft)
 
 Tiny FFT for the browser and Node, written in `no_std` Rust and compiled to WebAssembly. ~11 KB wasm, embedded as base64 in the JS bundle. 1D and 2D, in-place. Zero runtime dependencies.
