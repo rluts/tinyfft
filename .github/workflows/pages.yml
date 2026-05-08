@@ -54,11 +54,11 @@ jobs:
             <head>
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <meta http-equiv="refresh" content="0; url=./examples/spectrum-viewer/" />
+              <meta http-equiv="refresh" content="0; url=./examples/image-filter/" />
               <title>tinyfft examples</title>
             </head>
             <body>
-              <a href="./examples/spectrum-viewer/">Open tinyfft spectrum viewer</a>
+              <a href="./examples/image-filter/">Open tinyfft image filter</a>
             </body>
           </html>
           HTML
