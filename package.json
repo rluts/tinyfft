@@ -1,7 +1,7 @@
 {
   "name": "tinyfft",
-  "version": "0.1.0",
-  "description": "Tiny no_std FFT (Cooley-Tukey radix-2) compiled to WebAssembly. 1D and 2D, ~11 KB wasm embedded as base64. Zero runtime dependencies.",
+  "version": "0.2.0",
+  "description": "Tiny no_std FFT (Cooley-Tukey radix-4, wasm SIMD) compiled to WebAssembly. 1D and 2D, ~13 KB wasm shipped as a raw file. Zero runtime dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,11 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./tinyfft.wasm": "./dist/tinyfft.wasm"
   },
   "sideEffects": false,
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/tinyfft.wasm",
     "README.md",
     "LICENSE"
   ],
@@ -23,13 +26,16 @@
     "build": "node ts/build.mjs",
     "test:rust": "cargo test --lib",
     "test:smoke": "node ts/smoke-test.mjs",
-    "test": "npm run test:rust && npm run build && npm run test:smoke",
+    "test:ts": "vitest run",
+    "test": "npm run test:rust && npm run build && npm run test:smoke && npm run test:ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
     "fft",
     "wasm",
     "webassembly",
+    "simd",
+    "radix-4",
     "no_std",
     "rust",
     "audio",
@@ -49,6 +55,7 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.9"
   }
 }

@@ -1,11 +1,11 @@
 [package]
 name = "tinyfft"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Tiny no_std FFT (Cooley-Tukey radix-2) targeting WebAssembly. 1D and 2D, ~11 KB wasm."
+description = "Tiny no_std FFT (Cooley-Tukey radix-4, wasm SIMD) targeting WebAssembly. 1D and 2D, ~13 KB wasm."
 license = "MIT"
 repository = "https://github.com/rluts/tinyfft"
-keywords = ["fft", "wasm", "no_std", "audio", "dsp"]
+keywords = ["fft", "wasm", "simd", "no_std", "dsp"]
 categories = ["algorithms", "no-std", "wasm"]
 
 [lib]

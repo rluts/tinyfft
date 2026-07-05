@@ -96,6 +96,8 @@ async function handleFile(file) {
   const { mags, numFrames, halfN } = stft(samples, FFT_SIZE, hop);
   const t1 = performance.now();
 
+  const stftMs = t1 - t0;
+  const msamples = (numFrames * FFT_SIZE) / (stftMs / 1000) / 1e6;
   renderInfo({
     file: file.name,
     duration: audio.duration.toFixed(2) + " s",
@@ -104,7 +106,8 @@ async function handleFile(file) {
     "fft size": FFT_SIZE,
     hop,
     frames: numFrames,
-    "stft time": (t1 - t0).toFixed(1) + " ms",
+    "stft time": stftMs.toFixed(1) + " ms",
+    throughput: msamples.toFixed(1) + " MSamples/s",
   });
   setStatus(
     `Rendered ${numFrames}×${halfN} spectrogram in ${(t1 - t0).toFixed(1)} ms`,
