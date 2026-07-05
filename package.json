@@ -1,7 +1,7 @@
 {
   "name": "tinyfft",
   "version": "0.2.0",
-  "description": "Tiny no_std FFT (Cooley-Tukey radix-4, planar wasm SIMD) compiled to WebAssembly. 1D and 2D, ~15 KB wasm shipped as a raw file. Zero runtime dependencies.",
+  "description": "Tiny FFT for the browser and Node, written in no_std Rust and compiled to WebAssembly. Radix-4 with wasm SIMD (planar layout), ~16 KB wasm shipped as a raw file. 1D and 2D, in-place, single-precision f32. Zero runtime dependencies. ",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

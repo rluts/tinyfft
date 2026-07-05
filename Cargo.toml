@@ -2,7 +2,7 @@
 name = "tinyfft"
 version = "0.2.0"
 edition = "2021"
-description = "Tiny no_std FFT (Cooley-Tukey radix-4, wasm SIMD) targeting WebAssembly. 1D and 2D, ~13 KB wasm."
+description = "Tiny FFT for the browser and Node, written in no_std Rust and compiled to WebAssembly. Radix-4 with wasm SIMD (planar layout), ~16 KB wasm shipped as a raw file. 1D and 2D, in-place, single-precision f32. Zero runtime dependencies."
 license = "MIT"
 repository = "https://github.com/rluts/tinyfft"
 keywords = ["fft", "wasm", "simd", "no_std", "dsp"]
