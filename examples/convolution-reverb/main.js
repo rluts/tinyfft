@@ -20,6 +20,10 @@ const timeEl = document.getElementById("time");
 const bypassEl = document.getElementById("bypass");
 const renderInfoEl = document.getElementById("render-info");
 
+const DEFAULT_AUDIO_URL =
+  "https://upload.wikimedia.org/wikipedia/commons/b/bd/Shchedryk_%28Carol_of_the_Bells%29_-_Instrumental.ogg";
+const DEFAULT_AUDIO_NAME = "Shchedryk (Carol of the Bells) — instrumental";
+
 let fft = null;
 let audioCtx = null;
 let originalBuffer = null;
@@ -36,10 +40,23 @@ init();
 async function init() {
   try {
     fft = await TinyFft.load();
-    setStatus(`WASM ready · arena ${(fft.arenaCapacity / (1024 * 1024)).toFixed(1)} MiB · drop a file`);
+    setStatus(`WASM ready · arena ${(fft.arenaCapacity / (1024 * 1024)).toFixed(1)} MiB`);
   } catch (e) {
     setStatus(`Failed to load WASM: ${e.message}`);
     throw e;
+  }
+  loadDefaultAudio();
+}
+
+async function loadDefaultAudio() {
+  setStatus(`Loading demo track: ${DEFAULT_AUDIO_NAME}...`);
+  try {
+    const resp = await fetch(DEFAULT_AUDIO_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    await useAudio(buf, DEFAULT_AUDIO_NAME);
+  } catch (e) {
+    setStatus(`Couldn't load demo track (${e.message}) — drop your own audio file`);
   }
 }
 
@@ -161,19 +178,26 @@ function convolve(input, ir, N) {
 async function handleFile(file) {
   if (!fft) return setStatus("WASM not loaded yet");
   setStatus(`Decoding ${file.name}...`);
-  stopPlayback();
-  playOffset = 0;
   try {
     const buf = await file.arrayBuffer();
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") await audioCtx.resume();
-    originalBuffer = await audioCtx.decodeAudioData(buf);
+    await useAudio(buf, file.name);
   } catch (e) {
     setStatus(`Decode failed: ${e.message}`);
-    return;
   }
+}
+
+// Decode an ArrayBuffer of encoded audio (WAV, OGG, MP3, … — anything the
+// browser's decodeAudioData supports) and run the convolution pipeline.
+async function useAudio(arrayBuffer, name) {
+  if (!fft) throw new Error("WASM not loaded yet");
+  stopPlayback();
+  playOffset = 0;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
   renderInfo({
-    file: file.name,
+    file: name,
     duration: originalBuffer.duration.toFixed(2) + " s",
     "sample rate": originalBuffer.sampleRate + " Hz",
     channels: originalBuffer.numberOfChannels,
