@@ -3,7 +3,6 @@
 **/node_modules
 examples/lib
 **/.DS_Store
-ts/wasm-bytes.ts
 *.tgz
 *.log
 .env

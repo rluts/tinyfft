@@ -1,0 +1,4 @@
+# Enable wasm SIMD (v128) for the wasm32 target so the radix-4 butterfly uses
+# the SIMD kernel. All modern browsers and Node >= 16 support simd128.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

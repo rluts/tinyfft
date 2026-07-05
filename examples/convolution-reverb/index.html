@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Convolution Reverb · tinyfft</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: #0e0e10;
+        color: #e6e6e6;
+        min-height: 100vh;
+      }
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #1f1f24;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      header small {
+        color: #777;
+        font-size: 0.8rem;
+      }
+      main {
+        padding: 1.5rem;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      label.drop {
+        display: block;
+        border: 1px dashed #2a2a30;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        color: #888;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      label.drop:hover,
+      label.drop.hover {
+        background: #16161a;
+        border-color: #6c79ff;
+        color: #d8d8e0;
+      }
+      label.drop input {
+        display: none;
+      }
+      label.drop b {
+        color: #c8c8d0;
+      }
+      #status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        color: #888;
+        margin-top: 0.85rem;
+      }
+      #info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.4rem 1.5rem;
+        font-size: 0.82rem;
+        color: #999;
+        margin-top: 0.6rem;
+      }
+      #info b {
+        color: #e6e6e6;
+        font-weight: 600;
+      }
+      .controls {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        color: #aaa;
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+        cursor: pointer;
+      }
+      .controls input[type="range"] {
+        accent-color: #6c79ff;
+      }
+      select,
+      button {
+        background: #16161a;
+        color: #e6e6e6;
+        border: 1px solid #2a2a30;
+        border-radius: 6px;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #render-info {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+        color: #6c79ff;
+        margin-top: 0.6rem;
+      }
+      footer {
+        margin-top: 1.5rem;
+        font-size: 0.78rem;
+        color: #666;
+      }
+      footer code {
+        color: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Convolution Reverb</h1>
+      <small>tinyfft · FFT overlap-add · WebAssembly</small>
+    </header>
+    <main>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="audio/*" />
+        <div>Drop an <b>audio</b> file here, or click to choose</div>
+      </label>
+      <div id="status">Loading WASM...</div>
+      <div id="info"></div>
+
+      <div class="controls">
+        <label>
+          Impulse response:
+          <select id="ir">
+            <option value="hall">Hall (2.5 s)</option>
+            <option value="plate">Plate (1.2 s)</option>
+            <option value="spring">Spring (0.8 s)</option>
+          </select>
+        </label>
+        <label>
+          Wet
+          <input type="range" id="wet" min="0" max="100" value="50" />
+          <span id="wet-val">50%</span>
+        </label>
+      </div>
+
+      <div class="controls">
+        <button id="play" disabled>▶ Play</button>
+        <input type="range" id="seek" min="0" max="100" step="0.1" value="0" disabled style="flex:1" />
+        <span id="time" style="font-family: ui-monospace, monospace;">0:00 / 0:00</span>
+        <label><input type="checkbox" id="bypass" /> Bypass (dry)</label>
+      </div>
+      <div id="render-info"></div>
+
+      <footer>
+        FFT-based fast convolution: the impulse response is transformed once and cached, then each
+        block is <code>forward → complex-multiply → inverse → overlap-add</code>. Run via
+        <code>npm --prefix examples run dev</code>, then open
+        <code>http://localhost:3000/convolution-reverb/</code>.
+      </footer>
+    </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "tinyfft": "../lib/tinyfft/dist/index.js"
+        }
+      }
+    </script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

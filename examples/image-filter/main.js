@@ -200,11 +200,14 @@ async function handleFile(file) {
     forwardMs: t1 - t0,
   };
 
+  const fwdMs = t1 - t0;
+  const mpix = (padW * padH) / (fwdMs / 1000) / 1e6;
   renderInfo({
     file: file.name,
     "image size": `${width}×${height}`,
-    "padded size": `${padW}×${padH}`,
-    "fwd 2D fft": (t1 - t0).toFixed(1) + " ms",
+    "padded size": `${padW}×${padH} (${((padW * padH * 16) / 1024).toFixed(0)} KiB)`,
+    "fwd 2D fft": fwdMs.toFixed(1) + " ms",
+    throughput: mpix.toFixed(1) + " Mpx/s",
   });
 
   applyFilter();

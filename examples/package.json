@@ -1,15 +1,16 @@
 {
   "name": "tinyfft-examples",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Browser examples for the tinyfft package",
+  "description": "Browser examples for the tinyfft package (built from the local source)",
   "scripts": {
     "dev": "serve -l 3000 .",
-    "postinstall": "mkdir -p lib/tinyfft/dist && cp node_modules/tinyfft/dist/index.js node_modules/tinyfft/dist/wasm-bytes.js lib/tinyfft/dist/"
+    "build:lib": "npm --prefix .. install && npm --prefix .. run build",
+    "copy:lib": "mkdir -p lib/tinyfft/dist && cp ../dist/index.js ../dist/tinyfft.wasm lib/tinyfft/dist/",
+    "postinstall": "npm run build:lib && npm run copy:lib"
   },
   "devDependencies": {
-    "serve": "^14.2.4",
-    "tinyfft": "0.1.0"
+    "serve": "^14.2.4"
   }
 }

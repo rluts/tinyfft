@@ -26,8 +26,14 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
+      - name: Update npm (OIDC trusted publishing needs npm >= 11.5.1)
+        run: npm install -g npm@latest
+
       - name: Install npm deps
         run: npm ci || npm install
+
+      - name: Install binaryen (wasm-opt)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
 
       - name: Build
         run: npm run build
@@ -44,7 +50,7 @@ jobs:
             exit 1
           fi
 
+      # Uses npm OIDC trusted publishing (configured in the npm package settings
+      # for this repo/workflow). No NPM_TOKEN needed; provenance is automatic.
       - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

@@ -37,11 +37,17 @@ jobs:
       - name: Install npm deps
         run: npm ci || npm install
 
+      - name: Install binaryen (wasm-opt)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Build (wasm + ts)
         run: npm run build
 
       - name: Smoke test
         run: npm run test:smoke
+
+      - name: TS unit tests (vitest)
+        run: npm run test:ts
 
       - name: npm pack (dry run)
         run: npm pack --dry-run

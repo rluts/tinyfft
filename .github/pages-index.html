@@ -100,7 +100,7 @@
     <header>
       <h1>tinyfft · live demos</h1>
       <p>
-        Tiny no_std FFT compiled to WebAssembly · 1D + 2D · ~11 KB wasm ·
+        Tiny no_std FFT (radix-4 · wasm SIMD) · 1D + 2D · ~11 KB wasm ·
         <a href="https://www.npmjs.com/package/tinyfft">npm</a> ·
         <a href="https://github.com/rluts/tinyfft">github</a>
       </p>
@@ -117,10 +117,10 @@
           <p>Drop an image, see a 2D-FFT high-pass filter. Gaussian or ideal cutoff, live slider.</p>
           <span class="tag">2D · high-pass</span>
         </a>
-        <a class="card" href="./examples/player-eq/">
-          <h2>FFT equalizer player</h2>
-          <p>Drop an audio file, play it through a 10-band overlap-add EQ. ISO octave bands, ±12 dB.</p>
-          <span class="tag">1D · OLA · audio</span>
+        <a class="card" href="./examples/convolution-reverb/">
+          <h2>Convolution reverb</h2>
+          <p>Drop audio, hear it convolved with an impulse response via FFT overlap-add. Wet/dry mix.</p>
+          <span class="tag">1D · convolution · audio</span>
         </a>
       </div>
     </main>

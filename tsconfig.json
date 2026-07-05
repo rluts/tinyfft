@@ -16,5 +16,11 @@
     "types": []
   },
   "include": ["ts/**/*.ts"],
-  "exclude": ["node_modules", "dist", "ts/build.mjs", "ts/smoke-test.mjs"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "ts/build.mjs",
+    "ts/smoke-test.mjs",
+    "ts/**/*.test.ts"
+  ]
 }
