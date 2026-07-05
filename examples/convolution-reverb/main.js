@@ -208,13 +208,13 @@ async function useAudio(arrayBuffer, name) {
   seekEl.disabled = false;
 }
 
-function scheduleReprocess() {
+function scheduleReprocess(delay = 150) {
   if (!originalBuffer) return;
   if (rerenderTimer) clearTimeout(rerenderTimer);
   rerenderTimer = setTimeout(() => {
     rerenderTimer = 0;
     reprocess();
-  }, 150);
+  }, delay);
 }
 
 async function reprocess() {
@@ -350,8 +350,10 @@ fileEl.addEventListener("change", (e) => {
 
 irEl.addEventListener("change", scheduleReprocess);
 wetEl.addEventListener("input", () => {
+  // Update the label instantly; debounce the (expensive) reconvolution longer
+  // so dragging the slider stays smooth.
   wetValEl.textContent = `${wetEl.value}%`;
-  scheduleReprocess();
+  scheduleReprocess(300);
 });
 
 playBtn.addEventListener("click", async () => {
