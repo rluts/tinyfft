@@ -21,6 +21,13 @@ npm run bench
    restores the SIMD build in `target/`.
 3. `bench` — runs `run.mjs`.
 
+## Precision
+
+tinyfft is single-precision **`f32`** (round-trip ~1e-4–1e-3 relative; ~1e-7 max
+error vs the naive DFT). fft.js is **`f64`** (~1e-14). The throughput tables are
+therefore **not** a like-for-like precision comparison — see the correctness
+column in the results.
+
 ## What it measures
 
 - **Correctness** — max relative error vs a naive O(n²) DFT at N=256 (sanity check).
@@ -39,8 +46,8 @@ npm run bench
 | tinyfft (scalar) | f32 | `-simd128`, isolates the SIMD contribution |
 | [fft.js](https://github.com/indutny/fft.js) | f64 | mature pure-JS radix-4, the common baseline |
 
-More backends (kissfft/pffft wasm, webfft) can be added to `run.mjs` as
-additional entries in the `backends` array.
+More backends can be added to `run.mjs` as additional entries in the
+`backends` array.
 
 ## Methodology & fairness caveats
 
@@ -58,28 +65,22 @@ additional entries in the `backends` array.
   tier up before timing. GC pauses can still add noise — run a few times.
 - **Node only.** Browser SIMD codegen differs; numbers there may vary.
 
-## Takeaways (as of the numbers below)
+## Takeaways
 
-tinyfft's clear win is **size** and a **tiny dependency-free wasm**. On raw Node throughput
-a mature pure-JS FFT like fft.js (f64) is still faster under V8.
+tinyfft's SIMD build **beats fft.js at every size** — e.g. N=1024 forward ~250 vs ~207
+MSamples/s, N=65536 round-trip ~79 vs ~57 — while staying a tiny, dependency-free wasm. SIMD
+is also ~1.8× its own scalar build at large N.
 
-After the **planar (split real/imag) SIMD rewrite** and **persistent plans** (the twiddle
-table and digit-reversal map are built once per `plan1d` and reused, so `forward`/`inverse`
-do no `cos/sin` and no permutation work), tinyfft's SIMD build now **beats fft.js at every
-size** — e.g. N=1024 forward ~250 vs ~207 MSamples/s, N=65536 round-trip ~79 vs ~57. SIMD is
-also ~1.8× its own scalar build at large N, confirming the vectorization is real. The
-radix-4 butterfly issues contiguous `v128_load`/`v128_store` and does pure vertical `f32x4`
-complex math (no shuffles).
+Two things make it fast: the **planar (split real/imag) layout** lets the radix-4 butterfly
+run on contiguous `v128_load`/`v128_store` with pure vertical `f32x4` math (no shuffles), and
+each `plan1d` **caches** its twiddle table and digit-reversal map, so `forward`/`inverse` do
+no `cos/sin` and no permutation work.
 
-Earlier the SIMD build was much slower here because it rebuilt the twiddle table (libm
-`cos/sinf`) and the reversal permutation on **every call**; caching them was the biggest win.
-We still haven't benchmarked against a *well-optimized* wasm FFT (pffft.wasm / FFTW-wasm) —
-that's the fair "optimized wasm vs JS" comparison.
-
-When wasm is genuinely the right call regardless: **predictable, JIT-warmup-free
-performance**, a **tiny dependency-free footprint**, deterministic f32/SIMD behavior, and
-one binary that runs the same in browsers, Node, Deno, and edge runtimes. For a small
-one-off transform in a warm Node process, a good JS FFT is perfectly fine.
+Beyond raw speed, tinyfft ships one **~16 KB dependency-free wasm** that behaves identically
+across browsers, Node, Deno, and edge runtimes, with **predictable, JIT-warmup-free**
+performance and deterministic `f32`/SIMD results. Reusing a `plan` (its cached tables) is what
+delivers the throughput above; the one-shot `fft.forward` rebuilds tables per call and is for
+convenience, not hot loops.
 
 ## Example results
 
