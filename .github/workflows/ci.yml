@@ -46,5 +46,8 @@ jobs:
       - name: Smoke test
         run: npm run test:smoke
 
+      - name: TS unit tests (vitest)
+        run: npm run test:ts
+
       - name: npm pack (dry run)
         run: npm pack --dry-run
