@@ -2,6 +2,10 @@ import { TinyFft } from "tinyfft";
 
 const MAX_DIM = 512;
 
+const DEFAULT_IMAGE_URL =
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Mud_Cow_Racing_-_Pacu_Jawi_-_West_Sumatra%2C_Indonesia.jpg/1280px-Mud_Cow_Racing_-_Pacu_Jawi_-_West_Sumatra%2C_Indonesia.jpg";
+const DEFAULT_IMAGE_NAME = "Pacu Jawi (mud cow racing), West Sumatra";
+
 const statusEl = document.getElementById("status");
 const dropEl = document.getElementById("drop");
 const fileEl = document.getElementById("file");
@@ -25,6 +29,24 @@ async function loadFft() {
   } catch (e) {
     setStatus(`Failed to load WASM: ${e.message}`);
     throw e;
+  }
+  loadDefaultImage();
+}
+
+async function loadDefaultImage() {
+  setStatus(`Loading demo image: ${DEFAULT_IMAGE_NAME}...`);
+  try {
+    const img = new Image();
+    // crossOrigin so the drawn canvas isn't tainted (Wikimedia sends CORS headers).
+    img.crossOrigin = "anonymous";
+    await new Promise((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("image load failed"));
+      img.src = DEFAULT_IMAGE_URL;
+    });
+    await processImage(img, DEFAULT_IMAGE_NAME);
+  } catch (e) {
+    setStatus(`Couldn't load demo image (${e.message}) — drop your own image file`);
   }
 }
 
@@ -147,6 +169,14 @@ async function handleFile(file) {
     setStatus(`Decode failed: ${e.message}`);
     return;
   }
+  await processImage(img, file.name);
+}
+
+async function processImage(img, name) {
+  if (!fft) {
+    setStatus("WASM not loaded yet");
+    return;
+  }
 
   const { width, height, gray } = imageToGray(img, MAX_DIM);
   drawGray(origCanvas, gray, width, height);
@@ -203,7 +233,7 @@ async function handleFile(file) {
   const fwdMs = t1 - t0;
   const mpix = (padW * padH) / (fwdMs / 1000) / 1e6;
   renderInfo({
-    file: file.name,
+    file: name,
     "image size": `${width}×${height}`,
     "padded size": `${padW}×${padH} (${((padW * padH * 16) / 1024).toFixed(0)} KiB)`,
     "fwd 2D fft": fwdMs.toFixed(1) + " ms",

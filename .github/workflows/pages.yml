@@ -49,6 +49,7 @@ jobs:
           cp -r examples/spectrum-viewer dist-pages/examples/
           cp -r examples/image-filter dist-pages/examples/
           cp -r examples/convolution-reverb dist-pages/examples/
+          cp -r examples/benchmark dist-pages/examples/
           mkdir -p dist-pages/examples/lib/tinyfft/dist
           cp examples/lib/tinyfft/dist/index.js examples/lib/tinyfft/dist/tinyfft.wasm dist-pages/examples/lib/tinyfft/dist/
           cp .github/pages-index.html dist-pages/index.html

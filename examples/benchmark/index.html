@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Benchmark · tinyfft</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: #0e0e10;
+        color: #e6e6e6;
+        min-height: 100vh;
+      }
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #1f1f24;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      header small {
+        color: #777;
+        font-size: 0.8rem;
+      }
+      .demo-nav {
+        margin-left: auto;
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+      }
+      .demo-nav a {
+        color: #aaa;
+        text-decoration: none;
+        padding: 0.25rem 0.55rem;
+        border-radius: 5px;
+        border: 1px solid transparent;
+      }
+      .demo-nav a:hover {
+        background: #16161a;
+        color: #e6e6e6;
+      }
+      .demo-nav a.active {
+        color: #6c79ff;
+        border-color: #2a2a30;
+        background: rgba(108, 121, 255, 0.1);
+      }
+      .demo-nav a.ext {
+        color: #777;
+      }
+      main {
+        padding: 1.5rem;
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.4rem 1.5rem;
+        font-size: 0.85rem;
+        color: #999;
+        margin-bottom: 1rem;
+      }
+      .stats b {
+        color: #e6e6e6;
+        font-weight: 600;
+      }
+      button {
+        background: #16161a;
+        color: #e6e6e6;
+        border: 1px solid #2a2a30;
+        border-radius: 6px;
+        padding: 0.4rem 0.9rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        color: #888;
+        margin: 0.85rem 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        margin-top: 0.5rem;
+      }
+      th,
+      td {
+        text-align: right;
+        padding: 0.45rem 0.8rem;
+        border-bottom: 1px solid #1f1f24;
+        font-variant-numeric: tabular-nums;
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+      th {
+        color: #999;
+        font-weight: 600;
+        font-size: 0.8rem;
+      }
+      td.fwd,
+      td.rt {
+        color: #6c79ff;
+        font-family: ui-monospace, monospace;
+      }
+      footer {
+        margin-top: 1.5rem;
+        font-size: 0.78rem;
+        color: #666;
+        line-height: 1.5;
+      }
+      footer code {
+        color: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Benchmark</h1>
+      <small>tinyfft · radix-4 · wasm SIMD · single-thread</small>
+      <nav class="demo-nav">
+        <a href="../spectrum-viewer/">Spectrum</a>
+        <a href="../image-filter/">Image filter</a>
+        <a href="../convolution-reverb/">Reverb</a>
+        <a href="../benchmark/" class="active">Benchmark</a>
+        <a href="https://github.com/rluts/tinyfft" class="ext">GitHub ↗</a>
+      </nav>
+    </header>
+    <main>
+      <div class="stats">
+        <div>wasm size: <b id="wasm-size">…</b></div>
+        <div>cold load: <b id="cold-load">…</b></div>
+      </div>
+
+      <button id="run" disabled>Run benchmark</button>
+      <div id="status">Loading WASM...</div>
+
+      <table id="results">
+        <thead>
+          <tr>
+            <th>N (complex)</th>
+            <th>forward (MSamples/s)</th>
+            <th>round-trip (MSamples/s)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <footer>
+        Measured live in <b>your</b> browser: a reused <code>plan1d(N)</code> (its twiddle and
+        digit-reversal tables are cached once, so <code>forward</code>/<code>inverse</code> do no
+        <code>cos/sin</code> or permutation work) is transformed in a warm loop. Higher is better;
+        numbers vary by machine and browser. This mirrors the Node suite in
+        <code>bench/</code>, which also compares against a scalar tinyfft build and
+        <code>fft.js</code>.
+      </footer>
+    </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "tinyfft": "../lib/tinyfft/dist/index.js"
+        }
+      }
+    </script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

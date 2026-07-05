@@ -100,7 +100,7 @@
     <header>
       <h1>tinyfft · live demos</h1>
       <p>
-        Tiny no_std FFT (radix-4 · wasm SIMD) · 1D + 2D · ~11 KB wasm ·
+        Tiny no_std FFT (radix-4 · wasm SIMD) · 1D + 2D · ~16 KB wasm ·
         <a href="https://www.npmjs.com/package/tinyfft">npm</a> ·
         <a href="https://github.com/rluts/tinyfft">github</a>
       </p>
@@ -121,6 +121,11 @@
           <h2>Convolution reverb</h2>
           <p>Drop audio, hear it convolved with an impulse response via FFT overlap-add. Wet/dry mix.</p>
           <span class="tag">1D · convolution · audio</span>
+        </a>
+        <a class="card" href="./examples/benchmark/">
+          <h2>Benchmark</h2>
+          <p>Measure tinyfft's throughput live in your browser — forward &amp; round-trip MSamples/s across sizes, plus wasm size and cold-load.</p>
+          <span class="tag">1D · performance</span>
         </a>
       </div>
     </main>

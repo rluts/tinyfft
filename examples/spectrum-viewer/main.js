@@ -15,6 +15,10 @@ const axisTop = document.getElementById("axis-top");
 const axisBot = document.getElementById("axis-bot");
 const axisRight = document.getElementById("axis-right");
 
+const DEFAULT_AUDIO_URL =
+  "https://upload.wikimedia.org/wikipedia/commons/b/bd/Shchedryk_%28Carol_of_the_Bells%29_-_Instrumental.ogg";
+const DEFAULT_AUDIO_NAME = "Shchedryk (Carol of the Bells) — instrumental";
+
 let fft = null;
 let lastResult = null;
 let scaleMode = "linear";
@@ -33,6 +37,19 @@ async function loadFft() {
   } catch (e) {
     setStatus(`Failed to load WASM: ${e.message}`);
     throw e;
+  }
+  loadDefaultAudio();
+}
+
+async function loadDefaultAudio() {
+  setStatus(`Loading demo track: ${DEFAULT_AUDIO_NAME}...`);
+  try {
+    const resp = await fetch(DEFAULT_AUDIO_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    await processAudio(buf, DEFAULT_AUDIO_NAME);
+  } catch (e) {
+    setStatus(`Couldn't load demo track (${e.message}) — drop your own audio file`);
   }
 }
 
@@ -73,16 +90,20 @@ async function handleFile(file) {
     return;
   }
   setStatus(`Decoding ${file.name}...`);
-  let audio;
   try {
     const buf = await file.arrayBuffer();
-    const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
-    audio = await ctxAudio.decodeAudioData(buf);
-    ctxAudio.close();
+    await processAudio(buf, file.name);
   } catch (e) {
     setStatus(`Decode failed: ${e.message}`);
-    return;
   }
+}
+
+// Decode encoded audio (WAV, OGG, MP3, …) and render its spectrogram.
+async function processAudio(arrayBuffer, name) {
+  if (!fft) throw new Error("WASM not loaded yet");
+  const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+  const audio = await ctxAudio.decodeAudioData(arrayBuffer);
+  ctxAudio.close();
 
   const samples = audio.getChannelData(0);
   const sampleRate = audio.sampleRate;
@@ -99,7 +120,7 @@ async function handleFile(file) {
   const stftMs = t1 - t0;
   const msamples = (numFrames * FFT_SIZE) / (stftMs / 1000) / 1e6;
   renderInfo({
-    file: file.name,
+    file: name,
     duration: audio.duration.toFixed(2) + " s",
     "sample rate": sampleRate + " Hz",
     channels: audio.numberOfChannels,

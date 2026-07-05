@@ -34,6 +34,32 @@
         color: #777;
         font-size: 0.8rem;
       }
+      .demo-nav {
+        margin-left: auto;
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+      }
+      .demo-nav a {
+        color: #aaa;
+        text-decoration: none;
+        padding: 0.25rem 0.55rem;
+        border-radius: 5px;
+        border: 1px solid transparent;
+      }
+      .demo-nav a:hover {
+        background: #16161a;
+        color: #e6e6e6;
+      }
+      .demo-nav a.active {
+        color: #6c79ff;
+        border-color: #2a2a30;
+        background: rgba(108, 121, 255, 0.1);
+      }
+      .demo-nav a.ext {
+        color: #777;
+      }
       main {
         padding: 1.5rem;
         max-width: 1400px;
@@ -151,6 +177,13 @@
     <header>
       <h1>FFT High-Pass Image Filter</h1>
       <small>tinyfft · 2D · WebAssembly</small>
+      <nav class="demo-nav">
+        <a href="../spectrum-viewer/">Spectrum</a>
+        <a href="../image-filter/" class="active">Image filter</a>
+        <a href="../convolution-reverb/">Reverb</a>
+        <a href="../benchmark/">Benchmark</a>
+        <a href="https://github.com/rluts/tinyfft" class="ext">GitHub ↗</a>
+      </nav>
     </header>
     <main>
       <label class="drop" id="drop">

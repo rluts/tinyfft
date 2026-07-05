@@ -5,7 +5,7 @@
 
 Tiny FFT for the browser and Node, written in `no_std` Rust and compiled to WebAssembly. **Radix-4 with wasm SIMD** (planar layout), ~16 KB wasm shipped as a raw file. 1D and 2D, in-place, single-precision `f32`. Zero runtime dependencies.
 
-**Live demos:** [WAV Spectrum Viewer](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) · [FFT Image Filter](https://rluts.github.io/tinyfft/examples/image-filter/) · [Convolution Reverb](https://rluts.github.io/tinyfft/examples/convolution-reverb/)
+**Live demos:** [WAV Spectrum Viewer](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) · [FFT Image Filter](https://rluts.github.io/tinyfft/examples/image-filter/) · [Convolution Reverb](https://rluts.github.io/tinyfft/examples/convolution-reverb/) · [Benchmark](https://rluts.github.io/tinyfft/examples/benchmark/)
 
 ```bash
 npm install tinyfft
@@ -103,7 +103,7 @@ If `wasm-opt` isn't installed the build still works and copies the unoptimized w
 
 ## Examples
 
-Three browser demos live under [examples/](examples). They build tinyfft from the local source (the examples `postinstall` runs `npm run build` in the repo root and copies `dist/index.js` + `dist/tinyfft.wasm` into `examples/lib/`), so demos always reflect your working tree — no published npm version needed.
+Four browser demos live under [examples/](examples). They build tinyfft from the local source (the examples `postinstall` runs `npm run build` in the repo root and copies `dist/index.js` + `dist/tinyfft.wasm` into `examples/lib/`), so demos always reflect your working tree — no published npm version needed.
 
 Live: <https://rluts.github.io/tinyfft/>
 
@@ -112,6 +112,7 @@ Live: <https://rluts.github.io/tinyfft/>
 | Spectrum viewer (1D STFT) — drop a WAV, see its spectrogram (linear or log freq, magma colormap).         | [examples/spectrum-viewer/](examples/spectrum-viewer)       | [demo](https://rluts.github.io/tinyfft/examples/spectrum-viewer/)    |
 | Image high-pass filter (2D) — drop an image, Gaussian or ideal cutoff, live slider.                       | [examples/image-filter/](examples/image-filter)             | [demo](https://rluts.github.io/tinyfft/examples/image-filter/)       |
 | Convolution reverb (1D) — drop audio, convolve with an impulse response via FFT overlap-add, wet/dry mix. | [examples/convolution-reverb/](examples/convolution-reverb) | [demo](https://rluts.github.io/tinyfft/examples/convolution-reverb/) |
+| Benchmark (1D) — measure forward & round-trip throughput (MSamples/s) live in your browser, plus wasm size and cold-load. | [examples/benchmark/](examples/benchmark) | [demo](https://rluts.github.io/tinyfft/examples/benchmark/) |
 
 Run locally:
 
@@ -122,6 +123,7 @@ npm run dev         # static server on :3000
 # open http://localhost:3000/spectrum-viewer/
 # or   http://localhost:3000/image-filter/
 # or   http://localhost:3000/convolution-reverb/
+# or   http://localhost:3000/benchmark/
 ```
 
 The live site is built and deployed by [.github/workflows/pages.yml](.github/workflows/pages.yml) on every push to `main`.
