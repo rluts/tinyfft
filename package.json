@@ -1,7 +1,7 @@
 {
   "name": "tinyfft",
   "version": "0.2.0",
-  "description": "Tiny no_std FFT (Cooley-Tukey radix-4, wasm SIMD) compiled to WebAssembly. 1D and 2D, ~13 KB wasm shipped as a raw file. Zero runtime dependencies.",
+  "description": "Tiny no_std FFT (Cooley-Tukey radix-4, planar wasm SIMD) compiled to WebAssembly. 1D and 2D, ~15 KB wasm shipped as a raw file. Zero runtime dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,6 +28,7 @@
     "test:smoke": "node ts/smoke-test.mjs",
     "test:ts": "vitest run",
     "test": "npm run test:rust && npm run build && npm run test:smoke && npm run test:ts",
+    "bench": "npm --prefix bench install && npm --prefix bench run bench:full",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

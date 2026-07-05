@@ -28,6 +28,10 @@ interface Exports {
   fft_mark(): number;
   fft_release(mark: number): void;
   fft_arena_capacity(): number;
+  fft_plan_create(n: number): number;
+  fft_plan_data(plan: number): number;
+  fft_plan_forward(plan: number): number;
+  fft_plan_inverse(plan: number): number;
 }
 
 function isPow2(n: number): boolean {
@@ -131,6 +135,7 @@ export class TinyFft {
 export class Plan1D {
   readonly n: number;
   private readonly _exports: Exports;
+  private readonly _plan: number;
   private readonly _ptr: number;
   private _view: Float32Array;
   private _buffer: ArrayBufferLike;
@@ -140,17 +145,20 @@ export class Plan1D {
     if (!isPow2(n)) {
       throw new Error(`n=${n} is not a power of two`);
     }
-    const ptr = exports.fft_alloc(n * 8);
-    if (ptr === 0) {
+    // A persistent plan caches the twiddle + digit-reversal tables in wasm,
+    // built once here; forward/inverse then do no cos/sin or permutation work.
+    const plan = exports.fft_plan_create(n);
+    if (plan === 0) {
       throw new Error(
-        `fft_alloc failed for ${n} complex samples (${n * 8} bytes, arena ${exports.fft_arena_capacity()} bytes)`,
+        `fft_plan_create failed for ${n} complex samples (arena ${exports.fft_arena_capacity()} bytes)`,
       );
     }
     this._exports = exports;
     this.n = n;
-    this._ptr = ptr;
+    this._plan = plan;
+    this._ptr = exports.fft_plan_data(plan);
     this._buffer = exports.memory.buffer;
-    this._view = new Float32Array(this._buffer, ptr, n * 2);
+    this._view = new Float32Array(this._buffer, this._ptr, n * 2);
   }
 
   /**
@@ -169,12 +177,12 @@ export class Plan1D {
   }
 
   forward(): void {
-    const c = this._exports.fft_forward(this._ptr, this.n);
+    const c = this._exports.fft_plan_forward(this._plan);
     if (c !== 0) throw new FftError(c);
   }
 
   inverse(): void {
-    const c = this._exports.fft_inverse(this._ptr, this.n);
+    const c = this._exports.fft_plan_inverse(this._plan);
     if (c !== 0) throw new FftError(c);
   }
 }

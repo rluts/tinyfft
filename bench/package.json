@@ -1,0 +1,16 @@
+{
+  "name": "tinyfft-bench",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Benchmarks for tinyfft vs popular JS/WASM FFT libraries (built from local source)",
+  "scripts": {
+    "build:lib": "npm --prefix .. install && npm --prefix .. run build",
+    "build:scalar": "node build-scalar.mjs",
+    "bench": "node run.mjs",
+    "bench:full": "npm run build:lib && npm run build:scalar && node run.mjs"
+  },
+  "devDependencies": {
+    "fft.js": "^4.0.4"
+  }
+}

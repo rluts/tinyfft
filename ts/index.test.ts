@@ -194,7 +194,7 @@ describe("arena / lifetime", () => {
     fft.reset();
     // Arena is 8 MiB; a single plan far larger than that must fail to allocate.
     const tooBig = 1 << 24; // 16M complex = 128 MiB
-    expect(() => fft.plan1d(tooBig)).toThrow(/fft_alloc failed/);
+    expect(() => fft.plan1d(tooBig)).toThrow(/fft_plan_create failed/);
   });
 
   it("reset lets a fresh plan reuse memory", () => {

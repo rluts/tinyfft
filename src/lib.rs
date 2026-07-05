@@ -14,8 +14,19 @@
 //! **Normalization:** the forward transform is unnormalized; the inverse divides
 //! by `1/N` (applied per pass, so 2D inverse is `1/(W·H)`).
 //!
-//! On `wasm32` with `simd128` enabled the butterfly loops use `core::arch::wasm32`
-//! intrinsics; on other targets (host tests) an equivalent scalar path is used.
+//! The engine works on a **planar (split real/imag) layout** internally: the
+//! interleaved `[re, im]` buffer is de-interleaved, transformed, and
+//! re-interleaved. On `wasm32` with `simd128` the radix-4 butterfly processes 4
+//! consecutive butterflies per step with contiguous `v128` loads/stores and pure
+//! vertical `f32x4` complex arithmetic; a scalar path covers the remainder and
+//! host (test) builds.
+//!
+//! **Plans:** the `fft_plan_*` FFI builds an arena-backed [`Plan`] that caches
+//! the all-stage twiddle table and the digit-reversal map **once**; repeated
+//! `fft_plan_forward`/`fft_plan_inverse` calls then do no `cos/sin` and no
+//! permutation computation (the reversal is fused into the de-interleave gather).
+//! The one-shot `fft`/`ifft` rlib API and the 2D path build these tables per
+//! call instead.
 
 use core::f32::consts::PI;
 
@@ -66,18 +77,6 @@ impl Complex {
     }
 
     pub const ZERO: Self = Self::new(0.0, 0.0);
-
-    /// Multiply by `-j` (i.e. rotate by -90°): `(re, im) -> (im, -re)`.
-    #[inline]
-    fn mul_neg_j(self) -> Self {
-        Self::new(self.im, -self.re)
-    }
-
-    /// Multiply by `+j` (i.e. rotate by +90°): `(re, im) -> (-im, re)`.
-    #[inline]
-    fn mul_pos_j(self) -> Self {
-        Self::new(-self.im, self.re)
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -135,182 +134,345 @@ fn digit_reverse_index(i: usize, bits: u32) -> usize {
     rev
 }
 
-/// Apply the base-4 digit-reversal permutation in place.
-///
-/// Unlike plain bit-reversal, this permutation is **not** an involution, so a
-/// naive swap loop is incorrect. We walk each permutation cycle instead, which
-/// needs no scratch buffer.
-fn digit_reverse_permute(data: &mut [Complex]) {
-    let n = data.len();
-    let bits = log2_pow2(n);
-    for i in 0..n {
-        let mut j = digit_reverse_index(i, bits);
-        // Rotate the cycle starting at `i`, but only once per cycle: act when
-        // `i` is the smallest index in its cycle.
-        let mut is_min = true;
-        while j != i {
-            if j < i {
-                is_min = false;
-                break;
-            }
-            j = digit_reverse_index(j, bits);
-        }
-        if !is_min {
-            continue;
-        }
-        // Move elements around the cycle.
-        let tmp = data[i];
-        let mut cur = i;
-        loop {
-            let next = digit_reverse_index(cur, bits);
-            if next == i {
-                data[cur] = tmp;
-                break;
-            }
-            data[cur] = data[next];
-            cur = next;
-        }
-    }
-}
-
-/// One radix-2 stage of size 2 (used first when `log2(N)` is odd).
-///
-/// Twiddle is always 1, so this is a pure add/sub over adjacent pairs.
+/// One radix-2 stage of size 2 on planar arrays (twiddle = 1: add/sub of pairs).
 #[inline]
-fn radix2_stage_size2(data: &mut [Complex]) {
-    let n = data.len();
+fn radix2_stage_size2_planar(re: &mut [f32], im: &mut [f32]) {
+    let n = re.len();
     let mut i = 0;
     while i + 1 < n {
-        let a = data[i];
-        let b = data[i + 1];
-        data[i] = a + b;
-        data[i + 1] = a - b;
+        let ar = re[i];
+        let ai = im[i];
+        let br = re[i + 1];
+        let bi = im[i + 1];
+        re[i] = ar + br;
+        im[i] = ai + bi;
+        re[i + 1] = ar - br;
+        im[i + 1] = ai - bi;
         i += 2;
     }
 }
 
-/// Scalar radix-4 butterfly for one group at base index `i0` (the `+k` offset is
-/// already folded into `i0`). `quarter = size / 4` is the sub-transform length.
-#[inline(always)]
-fn radix4_butterfly_scalar(
-    data: &mut [Complex],
-    i0: usize,
-    quarter: usize,
-    w1: Complex,
-    w2: Complex,
-    w3: Complex,
-    inverse: bool,
-) {
-    let i1 = i0 + quarter;
-    let i2 = i1 + quarter;
-    let i3 = i2 + quarter;
-
-    let a0 = data[i0];
-    let a1 = data[i1] * w1;
-    let a2 = data[i2] * w2;
-    let a3 = data[i3] * w3;
-
-    let t0 = a0 + a2;
-    let t1 = a0 - a2;
-    let t2 = a1 + a3;
-    let t3 = a1 - a3;
-
-    let t3r = if inverse {
-        t3.mul_pos_j()
-    } else {
-        t3.mul_neg_j()
-    };
-
-    data[i0] = t0 + t2;
-    data[i1] = t1 + t3r;
-    data[i2] = t0 - t2;
-    data[i3] = t1 - t3r;
+/// Fill a per-stage twiddle table (planar) for radix-4 stage of length `size`,
+/// using **forward** sign (`W = exp(-2πi/size)`). The inverse transform reuses
+/// the same table with the imaginary parts negated at load time (conjugate).
+///
+/// For each `k in 0..quarter` writes `w1=W^k, w2=W^{2k}, w3=W^{3k}`. Layout:
+/// `w1re[..], w1im[..], w2re[..], ...` — six contiguous `quarter`-length runs so
+/// the SIMD path can `v128_load` 4 twiddles at once. Uses direct `cos/sin` (no
+/// recurrence) to avoid drift.
+fn fill_twiddles(tw: &mut [f32], quarter: usize, size: usize) {
+    let base = -2.0 * PI / size as f32;
+    let (w1re, rest) = tw.split_at_mut(quarter);
+    let (w1im, rest) = rest.split_at_mut(quarter);
+    let (w2re, rest) = rest.split_at_mut(quarter);
+    let (w2im, rest) = rest.split_at_mut(quarter);
+    let (w3re, w3im) = rest.split_at_mut(quarter);
+    for k in 0..quarter {
+        let a1 = base * k as f32;
+        let a2 = a1 + a1;
+        let a3 = a2 + a1;
+        w1re[k] = libm::cosf(a1);
+        w1im[k] = libm::sinf(a1);
+        w2re[k] = libm::cosf(a2);
+        w2im[k] = libm::sinf(a2);
+        w3re[k] = libm::cosf(a3);
+        w3im[k] = libm::sinf(a3);
+    }
 }
 
-/// SIMD radix-4 butterfly processing **two** groups at once. The two groups
-/// (`start` and `start + size`) share the same twiddles, so each `f32x4` lane
-/// pair holds `[re, im]` for the two groups at the same position.
+/// Number of radix-4 twiddle floats needed to cache **all** stages of an
+/// `n`-point transform. Radix-4 stages have sizes 4,16,…(or 8,32,… after a
+/// leading radix-2 stage); summing `6 * (size/4)` over them gives this total.
+fn total_twiddle_len(n: usize) -> usize {
+    let log2n = log2_pow2(n);
+    let mut size = if log2n & 1 == 1 { 8 } else { 4 };
+    let mut total = 0usize;
+    while size <= n {
+        total += 6 * (size / 4);
+        size <<= 2;
+    }
+    total
+}
+
+/// Scalar radix-4 butterfly on planar arrays at indices `(i0,i1,i2,i3)` using
+/// twiddles `(w1,w2,w3)` given as `(re,im)` scalars.
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+fn radix4_bfly_planar_scalar(
+    re: &mut [f32],
+    im: &mut [f32],
+    i0: usize,
+    i1: usize,
+    i2: usize,
+    i3: usize,
+    w1re: f32,
+    w1im: f32,
+    w2re: f32,
+    w2im: f32,
+    w3re: f32,
+    w3im: f32,
+    inverse: bool,
+) {
+    // Twiddles are stored with forward sign; inverse uses the conjugate.
+    let s = if inverse { -1.0f32 } else { 1.0f32 };
+    let w1im = s * w1im;
+    let w2im = s * w2im;
+    let w3im = s * w3im;
+
+    let a0r = re[i0];
+    let a0i = im[i0];
+    // a_k = data[i_k] * w_k  (complex multiply)
+    let a1r = re[i1] * w1re - im[i1] * w1im;
+    let a1i = re[i1] * w1im + im[i1] * w1re;
+    let a2r = re[i2] * w2re - im[i2] * w2im;
+    let a2i = re[i2] * w2im + im[i2] * w2re;
+    let a3r = re[i3] * w3re - im[i3] * w3im;
+    let a3i = re[i3] * w3im + im[i3] * w3re;
+
+    let t0r = a0r + a2r;
+    let t0i = a0i + a2i;
+    let t1r = a0r - a2r;
+    let t1i = a0i - a2i;
+    let t2r = a1r + a3r;
+    let t2i = a1i + a3i;
+    let t3r = a1r - a3r;
+    let t3i = a1i - a3i;
+
+    // t3 * (∓j): forward -j -> (im, -re); inverse +j -> (-im, re)
+    let (jr, ji) = if inverse { (-t3i, t3r) } else { (t3i, -t3r) };
+
+    re[i0] = t0r + t2r;
+    im[i0] = t0i + t2i;
+    re[i1] = t1r + jr;
+    im[i1] = t1i + ji;
+    re[i2] = t0r - t2r;
+    im[i2] = t0i - t2i;
+    re[i3] = t1r - jr;
+    im[i3] = t1i - ji;
+}
+
+/// SIMD radix-4 butterfly: process **4 consecutive `k`** (butterfly indices)
+/// within one group, i.e. contiguous lanes `i0+0..i0+3` etc. Twiddles are loaded
+/// as vectors from the per-stage table. All loads/stores are contiguous
+/// `v128_load`/`v128_store`; the complex multiply is pure vertical arithmetic
+/// with no shuffles (planar layout).
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn radix4_butterfly_pair_simd(
-    data: &mut [Complex],
-    start: usize,
-    size: usize,
+unsafe fn radix4_bfly_planar_simd4(
+    re: &mut [f32],
+    im: &mut [f32],
+    i0: usize,
     quarter: usize,
+    tw: &[f32],
     k: usize,
-    w1: Complex,
-    w2: Complex,
-    w3: Complex,
     inverse: bool,
 ) {
     use core::arch::wasm32::*;
 
-    // Indices for group A (start) and group B (start + size).
-    let a_i0 = start + k;
-    let a_i1 = a_i0 + quarter;
-    let a_i2 = a_i1 + quarter;
-    let a_i3 = a_i2 + quarter;
-    let b_i0 = a_i0 + size;
-    let b_i1 = a_i1 + size;
-    let b_i2 = a_i2 + size;
-    let b_i3 = a_i3 + size;
+    let i1 = i0 + quarter;
+    let i2 = i1 + quarter;
+    let i3 = i2 + quarter;
 
-    // Load two complex values into one v128 as [re_a, im_a, re_b, im_b].
+    let rp = re.as_mut_ptr();
+    let ip = im.as_mut_ptr();
+
     #[inline(always)]
-    fn load2(data: &[Complex], ia: usize, ib: usize) -> v128 {
-        f32x4(data[ia].re, data[ia].im, data[ib].re, data[ib].im)
+    unsafe fn ld(p: *const f32, i: usize) -> v128 {
+        v128_load(p.add(i) as *const v128)
     }
     #[inline(always)]
-    fn store2(data: &mut [Complex], ia: usize, ib: usize, v: v128) {
-        data[ia] = Complex::new(f32x4_extract_lane::<0>(v), f32x4_extract_lane::<1>(v));
-        data[ib] = Complex::new(f32x4_extract_lane::<2>(v), f32x4_extract_lane::<3>(v));
+    unsafe fn st(p: *mut f32, i: usize, v: v128) {
+        v128_store(p.add(i) as *mut v128, v);
     }
-
-    // Complex multiply of packed [re,im,re,im] by a broadcast scalar twiddle w.
-    // (re + im i)(wr + wi i) = (re*wr - im*wi) + (re*wi + im*wr) i
-    // With v = [re,im,re,im], swapped = [im,re,im,re]:
-    //   p = v * wr_splat        = [re*wr, im*wr, ...]
-    //   q = swapped * wi_splat  = [im*wi, re*wi, ...]
-    //   result = p + q * [-1, +1, -1, +1]
-    //          = [re*wr - im*wi, im*wr + re*wi, ...]
+    // complex multiply of (xr,xi) by (wr,wi), all vectors
     #[inline(always)]
-    fn cmul_broadcast(v: v128, w: Complex) -> v128 {
-        let swapped = i32x4_shuffle::<1, 0, 3, 2>(v, v);
-        let p = f32x4_mul(v, f32x4_splat(w.re));
-        let q = f32x4_mul(swapped, f32x4_splat(w.im));
-        let q_signed = f32x4_mul(q, f32x4(-1.0, 1.0, -1.0, 1.0));
-        f32x4_add(p, q_signed)
+    fn cmul(xr: v128, xi: v128, wr: v128, wi: v128) -> (v128, v128) {
+        (
+            f32x4_sub(f32x4_mul(xr, wr), f32x4_mul(xi, wi)),
+            f32x4_add(f32x4_mul(xr, wi), f32x4_mul(xi, wr)),
+        )
     }
 
-    let a0 = load2(data, a_i0, b_i0);
-    let a1 = cmul_broadcast(load2(data, a_i1, b_i1), w1);
-    let a2 = cmul_broadcast(load2(data, a_i2, b_i2), w2);
-    let a3 = cmul_broadcast(load2(data, a_i3, b_i3), w3);
+    // twiddle table offsets: [w1re, w1im, w2re, w2im, w3re, w3im]. Table stores
+    // forward twiddles; inverse uses the conjugate (negate imaginary parts).
+    let twp = tw.as_ptr();
+    let w1r = ld(twp, k);
+    let w2r = ld(twp, 2 * quarter + k);
+    let w3r = ld(twp, 4 * quarter + k);
+    let mut w1i = ld(twp, quarter + k);
+    let mut w2i = ld(twp, 3 * quarter + k);
+    let mut w3i = ld(twp, 5 * quarter + k);
+    if inverse {
+        w1i = f32x4_neg(w1i);
+        w2i = f32x4_neg(w2i);
+        w3i = f32x4_neg(w3i);
+    }
 
-    let t0 = f32x4_add(a0, a2);
-    let t1 = f32x4_sub(a0, a2);
-    let t2 = f32x4_add(a1, a3);
-    let t3 = f32x4_sub(a1, a3);
+    let a0r = ld(rp, i0);
+    let a0i = ld(ip, i0);
+    let (a1r, a1i) = cmul(ld(rp, i1), ld(ip, i1), w1r, w1i);
+    let (a2r, a2i) = cmul(ld(rp, i2), ld(ip, i2), w2r, w2i);
+    let (a3r, a3i) = cmul(ld(rp, i3), ld(ip, i3), w3r, w3i);
 
-    // Multiply t3 by -j (forward) or +j (inverse), per packed complex.
-    // -j*(re+im i) = im - re i  => [im, -re]
-    // +j*(re+im i) = -im + re i => [-im, re]
-    let t3_swap = i32x4_shuffle::<1, 0, 3, 2>(t3, t3); // [im, re, im, re]
-    let t3r = if inverse {
-        // [-im, re, -im, re] = t3_swap * [-1, 1, -1, 1]
-        f32x4_mul(t3_swap, f32x4(-1.0, 1.0, -1.0, 1.0))
+    let t0r = f32x4_add(a0r, a2r);
+    let t0i = f32x4_add(a0i, a2i);
+    let t1r = f32x4_sub(a0r, a2r);
+    let t1i = f32x4_sub(a0i, a2i);
+    let t2r = f32x4_add(a1r, a3r);
+    let t2i = f32x4_add(a1i, a3i);
+    let t3r = f32x4_sub(a1r, a3r);
+    let t3i = f32x4_sub(a1i, a3i);
+
+    // t3 * (∓j): forward -> (t3i, -t3r); inverse -> (-t3i, t3r)
+    let (jr, ji) = if inverse {
+        (f32x4_neg(t3i), t3r)
     } else {
-        // [im, -re, im, -re] = t3_swap * [1, -1, 1, -1]
-        f32x4_mul(t3_swap, f32x4(1.0, -1.0, 1.0, -1.0))
+        (t3i, f32x4_neg(t3r))
     };
 
-    store2(data, a_i0, b_i0, f32x4_add(t0, t2));
-    store2(data, a_i1, b_i1, f32x4_add(t1, t3r));
-    store2(data, a_i2, b_i2, f32x4_sub(t0, t2));
-    store2(data, a_i3, b_i3, f32x4_sub(t1, t3r));
+    st(rp, i0, f32x4_add(t0r, t2r));
+    st(ip, i0, f32x4_add(t0i, t2i));
+    st(rp, i1, f32x4_add(t1r, jr));
+    st(ip, i1, f32x4_add(t1i, ji));
+    st(rp, i2, f32x4_sub(t0r, t2r));
+    st(ip, i2, f32x4_sub(t0i, t2i));
+    st(rp, i3, f32x4_sub(t1r, jr));
+    st(ip, i3, f32x4_sub(t1i, ji));
 }
 
+/// Planar radix-4 (+ optional leading radix-2) FFT engine over split arrays,
+/// using a **precomputed all-stage twiddle table** `tw` (see [`fill_twiddles`] /
+/// [`total_twiddle_len`]). Input `re`/`im` are assumed **already permuted** into
+/// digit-reversed order (fused into the deinterleave step). No per-call `cos/sin`
+/// and no per-call permutation.
+fn fft_planar(re: &mut [f32], im: &mut [f32], tw: &[f32], inverse: bool) {
+    let n = re.len();
+    let log2n = log2_pow2(n);
+
+    let mut size;
+    if log2n & 1 == 1 {
+        radix2_stage_size2_planar(re, im);
+        size = 8;
+    } else {
+        size = 4;
+    }
+
+    // Walk the concatenated per-stage twiddle blocks.
+    let mut tw_off = 0usize;
+    while size <= n {
+        let quarter = size / 4;
+        let stage_tw = &tw[tw_off..tw_off + 6 * quarter];
+        tw_off += 6 * quarter;
+
+        let mut start = 0usize;
+        while start < n {
+            let base0 = start;
+            let mut k = 0usize;
+
+            // SIMD: 4 consecutive k at a time (contiguous lanes).
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                while k + 4 <= quarter {
+                    unsafe {
+                        radix4_bfly_planar_simd4(re, im, base0 + k, quarter, stage_tw, k, inverse);
+                    }
+                    k += 4;
+                }
+            }
+
+            // Scalar remainder (and the whole loop on non-SIMD targets).
+            while k < quarter {
+                let i0 = base0 + k;
+                radix4_bfly_planar_scalar(
+                    re,
+                    im,
+                    i0,
+                    i0 + quarter,
+                    i0 + 2 * quarter,
+                    i0 + 3 * quarter,
+                    stage_tw[k],
+                    stage_tw[quarter + k],
+                    stage_tw[2 * quarter + k],
+                    stage_tw[3 * quarter + k],
+                    stage_tw[4 * quarter + k],
+                    stage_tw[5 * quarter + k],
+                    inverse,
+                );
+                k += 1;
+            }
+            start += size;
+        }
+        size <<= 2;
+    }
+
+    if inverse {
+        let inv_n = 1.0 / n as f32;
+        for x in re.iter_mut() {
+            *x *= inv_n;
+        }
+        for x in im.iter_mut() {
+            *x *= inv_n;
+        }
+    }
+}
+
+/// Fill the concatenated all-stage twiddle table for an `n`-point transform.
+/// Blocks are stored stage by stage (sizes 4,16,… or 8,32,… after a radix-2
+/// stage), each of length `6 * (size/4)`; total is [`total_twiddle_len`].
+fn build_twiddle_table(tw: &mut [f32], n: usize) {
+    let log2n = log2_pow2(n);
+    let mut size = if log2n & 1 == 1 { 8 } else { 4 };
+    let mut off = 0usize;
+    while size <= n {
+        let quarter = size / 4;
+        let len = 6 * quarter;
+        fill_twiddles(&mut tw[off..off + len], quarter, size);
+        off += len;
+        size <<= 2;
+    }
+}
+
+/// Fill a digit-reversal permutation map: `perm[i] = digit_reverse_index(i)`.
+/// Applied via gather at deinterleave time (`re[i] = data[perm[i]].re`), which
+/// fuses the reordering into a pass we already do and needs no cycle-walking.
+fn build_perm(perm: &mut [u32], n: usize) {
+    let bits = log2_pow2(n);
+    for (i, p) in perm.iter_mut().enumerate() {
+        *p = digit_reverse_index(i, bits) as u32;
+    }
+}
+
+/// Run the planar engine over an interleaved buffer with **precomputed** tables.
+/// Fuses the digit-reversal into the deinterleave gather (`re[i]=data[perm[i]]`),
+/// runs the SoA engine on `re`/`im`, then re-interleaves.
+fn fft_run_planar(
+    data: &mut [Complex],
+    re: &mut [f32],
+    im: &mut [f32],
+    tw: &[f32],
+    perm: &[u32],
+    inverse: bool,
+) {
+    let n = data.len();
+    for i in 0..n {
+        let src = perm[i] as usize;
+        re[i] = data[src].re;
+        im[i] = data[src].im;
+    }
+    fft_planar(re, im, tw, inverse);
+    for i in 0..n {
+        data[i] = Complex::new(re[i], im[i]);
+    }
+}
+
+/// One-shot in-place FFT over an interleaved buffer, building the twiddle and
+/// permutation tables on the fly. Used by the rlib `fft`/`ifft` API and the 2D
+/// path. For repeated 1D transforms of the same size, use the persistent plan
+/// API (`fft_plan_*`) which caches these tables.
+///
+/// Scratch: `wasm32` uses the static arena (single-threaded); host builds use a
+/// per-call heap `Vec` so the multi-threaded test runner never shares the arena.
 fn fft_in_place(data: &mut [Complex], inverse: bool) -> Result<(), FftError> {
     let n = data.len();
     if n == 0 {
@@ -323,68 +485,37 @@ fn fft_in_place(data: &mut [Complex], inverse: bool) -> Result<(), FftError> {
         return Ok(());
     }
 
-    digit_reverse_permute(data);
+    let tw_len = total_twiddle_len(n);
 
-    let log2n = log2_pow2(n);
-    let sign = if inverse { 1.0f32 } else { -1.0f32 };
-
-    // If log2(N) is odd, do a single radix-2 stage of size 2 first so the
-    // remaining stages are all radix-4.
-    //
-    // - even log2(N): radix-4 stages combine sizes 4, 16, 64, ...
-    // - odd  log2(N): after the size-2 stage, radix-4 stages combine sizes
-    //   8, 32, 128, ... (each takes size/4-length sub-transforms).
-    let mut size;
-    if log2n & 1 == 1 {
-        radix2_stage_size2(data);
-        size = 8;
-    } else {
-        size = 4;
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        let mark = fft_mark();
+        let fptr = fft_alloc((2 * n + tw_len) * 4) as *mut f32;
+        let pptr = fft_alloc(n * 4) as *mut u32;
+        if fptr.is_null() || pptr.is_null() {
+            fft_release(mark);
+            return Err(FftError::EmptyInput);
+        }
+        let floats = core::slice::from_raw_parts_mut(fptr, 2 * n + tw_len);
+        let perm = core::slice::from_raw_parts_mut(pptr, n);
+        let (re, rest) = floats.split_at_mut(n);
+        let (im, tw) = rest.split_at_mut(n);
+        build_twiddle_table(tw, n);
+        build_perm(perm, n);
+        fft_run_planar(data, re, im, tw, perm, inverse);
+        fft_release(mark);
     }
 
-    // Radix-4 stages. `size` is the transform length handled by this stage
-    // (a power of four here). Each stage combines 4 sub-transforms of length
-    // `quarter = size / 4`.
-    //
-    // Loop order is `k` (twiddle index) outer, groups inner: every group at a
-    // given `k` shares the same twiddles `w1,w2,w3`, which lets the SIMD path
-    // process two groups per iteration with a broadcast twiddle.
-    while size <= n {
-        let quarter = size / 4;
-        let theta = sign * 2.0 * PI / size as f32;
-        let w1_step = Complex::new(libm::cosf(theta), libm::sinf(theta));
-
-        let mut w1 = Complex::new(1.0, 0.0);
-        for k in 0..quarter {
-            let w2 = w1 * w1;
-            let w3 = w2 * w1;
-
-            let mut start = 0usize;
-            // SIMD: handle two groups at a time (same k => same twiddles).
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                while start + size <= n && (start + size) + size <= n {
-                    radix4_butterfly_pair_simd(data, start, size, quarter, k, w1, w2, w3, inverse);
-                    start += 2 * size;
-                }
-            }
-            // Scalar tail (and the whole loop on non-SIMD targets).
-            while start + size <= n {
-                radix4_butterfly_scalar(data, start + k, quarter, w1, w2, w3, inverse);
-                start += size;
-            }
-
-            w1 = w1 * w1_step;
-        }
-        size <<= 2;
-    }
-
-    if inverse {
-        let inv_n = 1.0 / n as f32;
-        for c in data.iter_mut() {
-            c.re *= inv_n;
-            c.im *= inv_n;
-        }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        extern crate std;
+        let mut floats = std::vec![0.0f32; 2 * n + tw_len];
+        let mut perm = std::vec![0u32; n];
+        let (re, rest) = floats.split_at_mut(n);
+        let (im, tw) = rest.split_at_mut(n);
+        build_twiddle_table(tw, n);
+        build_perm(&mut perm, n);
+        fft_run_planar(data, re, im, tw, &perm, inverse);
     }
 
     Ok(())
@@ -431,6 +562,119 @@ unsafe fn run_fft(ptr: *mut f32, len: usize, inverse: bool) -> u32 {
         Ok(()) => 0,
         Err(e) => e as u32,
     }
+}
+
+// --- Persistent 1D plan -----------------------------------------------------
+//
+// A `Plan` caches, in the arena, everything a repeated same-size 1D transform
+// needs: the interleaved data buffer, planar re/im scratch, the all-stage
+// twiddle table, and the digit-reversal permutation map. The tables are built
+// **once** at creation, so `forward`/`inverse` do zero `cos/sin` and zero
+// permutation computation — just the fused-gather deinterleave, the SoA
+// butterflies, and re-interleave. This is the hot path used by the TS `Plan1D`.
+
+/// Handles into the arena for one cached 1D plan. All pointers are stable for
+/// the plan's lifetime (arena allocations are never moved; freed only by
+/// `fft_reset`/`fft_release` past the plan's mark).
+#[repr(C)]
+pub struct Plan {
+    n: usize,
+    data: *mut f32, // interleaved [re,im,...], len 2n  (the public view)
+    re: *mut f32,   // planar scratch, len n
+    im: *mut f32,   // planar scratch, len n
+    tw: *mut f32,   // all-stage twiddle table, len total_twiddle_len(n)
+    perm: *mut u32, // digit-reversal map, len n
+}
+
+/// Creates a cached 1D plan for `n` (power of two). Returns a pointer to the
+/// `Plan` (an opaque handle) or null on bad `n` / out of arena. The plan and its
+/// buffers are allocated from the arena; free them with `fft_reset` or by
+/// pairing `fft_mark`/`fft_release` around plan creation.
+///
+/// # Safety
+/// Single-threaded use only. The returned handle is valid until the arena is
+/// reset/released past it.
+#[no_mangle]
+pub unsafe extern "C" fn fft_plan_create(n: usize) -> *mut Plan {
+    if !is_pow2(n) || n < 2 {
+        return core::ptr::null_mut();
+    }
+    let tw_len = total_twiddle_len(n);
+
+    let plan_ptr = fft_alloc(core::mem::size_of::<Plan>()) as *mut Plan;
+    let data = fft_alloc(n * 8) as *mut f32;
+    let re = fft_alloc(n * 4) as *mut f32;
+    let im = fft_alloc(n * 4) as *mut f32;
+    let tw = fft_alloc(tw_len * 4) as *mut f32;
+    let perm = fft_alloc(n * 4) as *mut u32;
+    if plan_ptr.is_null()
+        || data.is_null()
+        || re.is_null()
+        || im.is_null()
+        || tw.is_null()
+        || perm.is_null()
+    {
+        return core::ptr::null_mut();
+    }
+
+    build_twiddle_table(core::slice::from_raw_parts_mut(tw, tw_len), n);
+    build_perm(core::slice::from_raw_parts_mut(perm, n), n);
+
+    plan_ptr.write(Plan {
+        n,
+        data,
+        re,
+        im,
+        tw,
+        perm,
+    });
+    plan_ptr
+}
+
+/// Returns the pointer to the plan's interleaved `[re,im,...]` data buffer
+/// (length `2n` f32) that callers read/write in place.
+///
+/// # Safety
+/// `plan` must be a valid handle from [`fft_plan_create`].
+#[no_mangle]
+pub unsafe extern "C" fn fft_plan_data(plan: *mut Plan) -> *mut f32 {
+    if plan.is_null() {
+        return core::ptr::null_mut();
+    }
+    (*plan).data
+}
+
+/// Runs a cached forward transform on the plan's data buffer.
+///
+/// # Safety
+/// `plan` must be a valid handle from [`fft_plan_create`].
+#[no_mangle]
+pub unsafe extern "C" fn fft_plan_forward(plan: *mut Plan) -> u32 {
+    run_plan(plan, false)
+}
+
+/// Runs a cached inverse transform on the plan's data buffer.
+///
+/// # Safety
+/// `plan` must be a valid handle from [`fft_plan_create`].
+#[no_mangle]
+pub unsafe extern "C" fn fft_plan_inverse(plan: *mut Plan) -> u32 {
+    run_plan(plan, true)
+}
+
+unsafe fn run_plan(plan: *mut Plan, inverse: bool) -> u32 {
+    if plan.is_null() {
+        return FftError::EmptyInput as u32;
+    }
+    let p = &*plan;
+    let n = p.n;
+    let data = core::slice::from_raw_parts_mut(p.data as *mut Complex, n);
+    let re = core::slice::from_raw_parts_mut(p.re, n);
+    let im = core::slice::from_raw_parts_mut(p.im, n);
+    let tw = core::slice::from_raw_parts(p.tw, total_twiddle_len(n));
+    let perm = core::slice::from_raw_parts(p.perm, n);
+    fft_run_planar(data, re, im, tw, perm, inverse);
+    0
 }
 
 /// Cache-friendly (blocked) out-of-place transpose. `src` is `rows x cols`

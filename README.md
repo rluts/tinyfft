@@ -3,7 +3,7 @@
 [![CI](https://github.com/rluts/tinyfft/actions/workflows/ci.yml/badge.svg)](https://github.com/rluts/tinyfft/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/tinyfft.svg)](https://www.npmjs.com/package/tinyfft)
 
-Tiny FFT for the browser and Node, written in `no_std` Rust and compiled to WebAssembly. **Radix-4 with wasm SIMD**, ~11 KB wasm shipped as a raw file. 1D and 2D, in-place, single-precision `f32`. Zero runtime dependencies.
+Tiny FFT for the browser and Node, written in `no_std` Rust and compiled to WebAssembly. **Radix-4 with wasm SIMD** (planar layout), ~16 KB wasm shipped as a raw file. 1D and 2D, in-place, single-precision `f32`. Zero runtime dependencies.
 
 **Live demos:** [WAV Spectrum Viewer](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) · [FFT Image Filter](https://rluts.github.io/tinyfft/examples/image-filter/) · [Convolution Reverb](https://rluts.github.io/tinyfft/examples/convolution-reverb/)
 
@@ -96,10 +96,10 @@ wasm SIMD is enabled via `.cargo/config.toml` (`-C target-feature=+simd128`). `n
 ```
 dist/index.js          # ESM entry
 dist/index.d.ts        # types
-dist/tinyfft.wasm      # raw wasm (~11 KB, radix-4 + SIMD, wasm-opt -O3)
+dist/tinyfft.wasm      # raw wasm (~16 KB, radix-4 + SIMD, wasm-opt -O3)
 ```
 
-If `wasm-opt` isn't installed the build still works and copies the unoptimized wasm (a few KB larger). Total tarball published to npm: ~13 KB.
+If `wasm-opt` isn't installed the build still works and copies the unoptimized wasm (a few KB larger). Total tarball published to npm: ~16 KB.
 
 ## Examples
 
@@ -107,10 +107,10 @@ Three browser demos live under [examples/](examples). They build tinyfft from th
 
 Live: <https://rluts.github.io/tinyfft/>
 
-| Demo | Source | Live |
-| ---- | ------ | ---- |
-| Spectrum viewer (1D STFT) — drop a WAV, see its spectrogram (linear or log freq, magma colormap). | [examples/spectrum-viewer/](examples/spectrum-viewer) | [demo](https://rluts.github.io/tinyfft/examples/spectrum-viewer/) |
-| Image high-pass filter (2D) — drop an image, Gaussian or ideal cutoff, live slider. | [examples/image-filter/](examples/image-filter) | [demo](https://rluts.github.io/tinyfft/examples/image-filter/) |
+| Demo                                                                                                      | Source                                                      | Live                                                                 |
+|-----------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------|
+| Spectrum viewer (1D STFT) — drop a WAV, see its spectrogram (linear or log freq, magma colormap).         | [examples/spectrum-viewer/](examples/spectrum-viewer)       | [demo](https://rluts.github.io/tinyfft/examples/spectrum-viewer/)    |
+| Image high-pass filter (2D) — drop an image, Gaussian or ideal cutoff, live slider.                       | [examples/image-filter/](examples/image-filter)             | [demo](https://rluts.github.io/tinyfft/examples/image-filter/)       |
 | Convolution reverb (1D) — drop audio, convolve with an impulse response via FFT overlap-add, wet/dry mix. | [examples/convolution-reverb/](examples/convolution-reverb) | [demo](https://rluts.github.io/tinyfft/examples/convolution-reverb/) |
 
 Run locally:
@@ -126,6 +126,24 @@ npm run dev         # static server on :3000
 
 The live site is built and deployed by [.github/workflows/pages.yml](.github/workflows/pages.yml) on every push to `main`.
 
+## Benchmarks
+
+A reproducible suite lives in [bench/](bench) comparing tinyfft against popular FFT libraries (currently [fft.js](https://github.com/indutny/fft.js)) on 1D throughput, artifact size, and cold-load time, plus a scalar-vs-SIMD tinyfft comparison.
+
+```bash
+npm run bench          # builds SIMD + scalar wasm variants, then benchmarks
+```
+
+With **persistent plans** (a `plan1d` caches its twiddle and digit-reversal tables, so `forward`/`inverse` do no `cos/sin` or permutation work), tinyfft's SIMD build **beats fft.js at every size** while staying a tiny zero-dependency wasm. Sample run (Apple Silicon, Node 25; regenerate locally, numbers vary by machine):
+
+| Backend               | Size     | round-trip N=1024 | round-trip N=65536 |
+|-----------------------|----------|-------------------|--------------------|
+| tinyfft (SIMD)        | 16.0 KiB | ~124 MSamples/s   | ~79 MSamples/s     |
+| tinyfft (scalar)      | 13.5 KiB | ~91 MSamples/s    | ~43 MSamples/s     |
+| fft.js (pure JS, f64) | 12.8 KiB | ~97 MSamples/s    | ~57 MSamples/s     |
+
+The engine uses a **planar (split real/imag) SIMD layout** so the radix-4 butterfly is pure vertical `f32x4` math with contiguous `v128` loads/stores, and each `plan1d(n)` precomputes the all-stage twiddle table and the digit-reversal map once (fused into the de-interleave gather). Use a reused `plan` (not the one-shot `fft.forward`) to get these numbers. See [bench/README.md](bench/README.md) for methodology and fairness caveats (f32 vs f64, in-place vs out-of-place, warmup).
+
 ## Releasing
 
 CI on every PR runs `cargo test`, builds the wasm + ts (with `wasm-opt`), runs the smoke + vitest tests, and verifies `npm pack`.
@@ -139,7 +157,7 @@ git push --follow-tags
 
 ## Algorithm
 
-Iterative Cooley–Tukey **radix-4** over `f32`, with a single **radix-2** stage when `log2(N)` is odd (so all power-of-two sizes work). Input is reordered by a base-4 digit-reversal permutation, then combined with radix-4 butterflies (three twiddles `w, w², w³` plus a free `±j` rotation). On `wasm32` the butterfly runs on 128-bit SIMD (`v128`), processing two groups per iteration; a scalar path covers the remainder and host builds. 2D is row FFTs → blocked (cache-friendly) transpose → row FFTs → transpose back, reusing the 1D code. Inverse normalization is per-pass so 2D inverse is automatically `1/(W·H)`.
+Iterative Cooley–Tukey **radix-4** over `f32`, with a single **radix-2** stage when `log2(N)` is odd (so all power-of-two sizes work). The engine runs on a **planar (split real/imag) layout**: the interleaved `[re,im]` input is de-interleaved into separate real/imag arrays, transformed, and re-interleaved. A `plan1d(n)` precomputes, once, the **all-stage twiddle table** (forward twiddles; the inverse reuses them conjugated) and the **base-4 digit-reversal map**, which is fused into the de-interleave gather (`re[i] = data[perm[i]]`) — so `forward`/`inverse` do zero `cos/sin` and zero permutation computation. Stages combine radix-4 butterflies (three twiddles `w, w², w³` plus a free `±j` rotation). On `wasm32` the butterfly processes **4 consecutive butterflies per step** with contiguous `v128` loads/stores and pure vertical `f32x4` complex arithmetic (no shuffles); a scalar path covers the remainder and host builds. 2D is row FFTs → blocked (cache-friendly) transpose → row FFTs → transpose back, reusing the 1D code. Inverse normalization is per-pass so 2D inverse is automatically `1/(W·H)`.
 
 ## License
 
