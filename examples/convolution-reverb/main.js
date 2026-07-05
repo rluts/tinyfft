@@ -193,7 +193,8 @@ async function useAudio(arrayBuffer, name) {
   stopPlayback();
   playOffset = 0;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") await audioCtx.resume();
+  // Note: don't resume() here — on initial page load there is no user gesture,
+  // and resume() would hang. decodeAudioData works on a suspended context.
   originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
   renderInfo({
@@ -353,12 +354,14 @@ wetEl.addEventListener("input", () => {
   scheduleReprocess();
 });
 
-playBtn.addEventListener("click", () => {
+playBtn.addEventListener("click", async () => {
   if (!processedBuffer) return;
   if (isPlaying) {
     playOffset = currentPosition();
     stopPlayback();
   } else {
+    // Resume the AudioContext now that we have a user gesture.
+    if (audioCtx && audioCtx.state === "suspended") await audioCtx.resume();
     startPlayback(playOffset);
   }
 });
